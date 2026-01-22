@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Linear Regression</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f9fafb;
+            min-height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            padding: 1rem;
+        }
+
+        @media (min-width: 1024px) {
+            .container {
+                flex-direction: row;
+                padding: 1.5rem;
+            }
+        }
+
+        .plot-area {
+            flex: 1;
+        }
+
+        @media (min-width: 1024px) {
+            .plot-area {
+                width: 70%;
+            }
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            color: #1f2937;
+        }
+
+        @media (min-width: 1024px) {
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+        }
+
+        svg {
+            width: 100%;
+            height: auto;
+            cursor: crosshair;
+        }
+
+        .chart-hint {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 0.5rem;
+            text-align: center;
+        }
+
+        .controls-area {
+            min-width: 280px;
+        }
+
+        @media (min-width: 1024px) {
+            .controls-area {
+                width: 30%;
+            }
+        }
+
+        .control-panel {
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        h2 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .slider-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .slider-value {
+            color: #2563eb;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 0.5rem;
+            border-radius: 0.25rem;
+            background: #e5e7eb;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 50%;
+            background: #2563eb;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 50%;
+            background: #2563eb;
+            cursor: pointer;
+            border: none;
+        }
+
+        .info-panel {
+            background: #f3f4f6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+        }
+
+        .info-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+
+        .equation {
+            font-size: 1.125rem;
+            font-family: 'Courier New', monospace;
+            color: #2563eb;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        button {
+            flex: 1;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid #d1d5db;
+            background: white;
+            color: #374151;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #f9fafb;
+        }
+
+        button.primary {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        button.primary:hover {
+            background: #1d4ed8;
+        }
+
+        .line {
+            stroke: #2563eb;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .point {
+            fill: #ef4444;
+            stroke: white;
+            stroke-width: 2;
+        }
+
+        .axis {
+            stroke: #9ca3af;
+        }
+
+        .axis text {
+            fill: #6b7280;
+            font-size: 12px;
+        }
+
+        .grid-line {
+            stroke: #e5e7eb;
+            stroke-width: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="plot-area">
+            <h1>Interactive Linear Regression</h1>
+            <div class="chart-container">
+                <svg id="chart" viewBox="0 0 600 400"></svg>
+            </div>
+            <p class="chart-hint">Click anywhere to add points</p>
+        </div>
+
+        <div class="controls-area">
+            <div class="control-panel">
+                <h2>Controls</h2>
+                
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Slope (w)</span>
+                        <span class="slider-value" id="w-value">0.50</span>
+                    </div>
+                    <input type="range" id="w-slider" min="0" max="3" step="0.1" value="0.5">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-label">
+                        <span>Y-Intercept (b)</span>
+                        <span class="slider-value" id="b-value">0.50</span>
+                    </div>
+                    <input type="range" id="b-slider" min="0" max="10" step="0.1" value="0.5">
+                </div>
+
+                <div class="info-panel">
+                    <div class="info-title">Current Equation</div>
+                    <p class="equation" id="equation">y = 0.50x + 0.50</p>
+                </div>
+
+                <div class="info-panel">
+                    <div class="info-title">Data Points: <span id="point-count">7</span></div>
+                    <div class="button-group">
+                        <button id="clear-btn">Clear All</button>
+                        <button id="reset-btn" class="primary">Reset</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let points = [
+            { x: 3.64, y: 6.22 }, { x: 2.67, y: 4.14 }, { x: 1.37, y: 4.25 },
+            { x: 6.22, y: 5.19 }, { x: 6.22, y: 7.65 }, { x: 4.69, y: 5.88 }, 
+            { x: 1.16, y: 1.65 }
+        ];
+        let w = 0.5;
+        let b = 0.5;
+
+        const initialPoints = [...points];
+
+        // SVG setup
+        const svg = d3.select('#chart');
+        const margin = { top: 20, right: 30, bottom: 30, left: 40 };
+        const width = 600 - margin.left - margin.right;
+        const height = 400 - margin.top - margin.bottom;
+
+        const g = svg.append('g')
+            .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        // Scales
+        const xScale = d3.scaleLinear().domain([0, 10]).range([0, width]);
+        const yScale = d3.scaleLinear().domain([0, 10]).range([height, 0]);
+
+        // Grid lines
+        const xGrid = g.append('g').attr('class', 'grid');
+        const yGrid = g.append('g').attr('class', 'grid');
+
+        for (let i = 0; i <= 10; i++) {
+            xGrid.append('line')
+                .attr('class', 'grid-line')
+                .attr('x1', xScale(i))
+                .attr('x2', xScale(i))
+                .attr('y1', 0)
+                .attr('y2', height);
+            
+            yGrid.append('line')
+                .attr('class', 'grid-line')
+                .attr('x1', 0)
+                .attr('x2', width)
+                .attr('y1', yScale(i))
+                .attr('y2', yScale(i));
+        }
+
+        // Axes
+        const xAxis = d3.axisBottom(xScale).ticks(10);
+        const yAxis = d3.axisLeft(yScale).ticks(10);
+
+        g.append('g')
+            .attr('class', 'axis')
+            .attr('transform', `translate(0,${height})`)
+            .call(xAxis);
+
+        g.append('g')
+            .attr('class', 'axis')
+            .call(yAxis);
+
+        // Line group
+        const lineGroup = g.append('g');
+        
+        // Points group
+        const pointsGroup = g.append('g');
+
+        // Render function
+        function render() {
+            // Update equation display
+            document.getElementById('equation').textContent = `y = ${w.toFixed(2)}x + ${b.toFixed(2)}`;
+            document.getElementById('point-count').textContent = points.length;
+
+            // Draw line
+            const lineData = [
+                { x: 0, y: b },
+                { x: 10, y: w * 10 + b }
+            ];
+
+            const line = d3.line()
+                .x(d => xScale(d.x))
+                .y(d => yScale(d.y));
+
+            lineGroup.selectAll('path').remove();
+            lineGroup.append('path')
+                .datum(lineData)
+                .attr('class', 'line')
+                .attr('d', line);
+
+            // Draw points
+            const circles = pointsGroup.selectAll('circle')
+                .data(points);
+
+            circles.exit().remove();
+
+            circles.enter()
+                .append('circle')
+                .merge(circles)
+                .attr('class', 'point')
+                .attr('cx', d => xScale(d.x))
+                .attr('cy', d => yScale(d.y))
+                .attr('r', 5);
+        }
+
+        // Event handlers
+        document.getElementById('w-slider').addEventListener('input', (e) => {
+            w = parseFloat(e.target.value);
+            document.getElementById('w-value').textContent = w.toFixed(2);
+            render();
+        });
+
+        document.getElementById('b-slider').addEventListener('input', (e) => {
+            b = parseFloat(e.target.value);
+            document.getElementById('b-value').textContent = b.toFixed(2);
+            render();
+        });
+
+        document.getElementById('clear-btn').addEventListener('click', () => {
+            points = [];
+            render();
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            points = [...initialPoints];
+            render();
+        });
+
+        svg.on('click', function(event) {
+            const [mouseX, mouseY] = d3.pointer(event);
+            
+            const x = mouseX - margin.left;
+            const y = mouseY - margin.top;
+            
+            if (x >= 0 && x <= width && y >= 0 && y <= height) {
+                const dataX = Math.max(0, Math.min(10, xScale.invert(x)));
+                const dataY = Math.max(0, Math.min(10, yScale.invert(y)));
+                
+                points.push({ x: dataX, y: dataY });
+                render();
+            }
+        });
+
+        // Initial render
+        render();
+    </script>
+</body>
+</html>
